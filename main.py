@@ -10,7 +10,7 @@ def single_thread_wCDM(p):
     ind = p
     walker = Walker(pars_range=[[0.0, 1.0], [-2.0, 0.5]],
                     likelihood_func=likelihood_func_wCDM,
-                    step_box_length=[0.05, 0.2], begin_step=1000)
+                    step_box_length=[0.05, 0.2], begin_step=2000)
     pars_on_chains = []
     likelihoods_on_chains = []
 
@@ -35,7 +35,7 @@ def single_thread_LambdaCDM(p):
     ind = p
     walker = Walker(pars_range=[[-0.5, 2.0], [-0.5, 2.0]],
                     likelihood_func=likelihood_func_LambdaCDM,
-                    step_box_length=[0.05, 0.1], begin_step=1000)
+                    step_box_length=[0.05, 0.1], begin_step=2000)
     pars_on_chains = []
     likelihoods_on_chains = []
 
