@@ -1,0 +1,555 @@
+# ## draft, no longer used##
+# # coding: utf-8
+#
+# # In[105]:
+#
+# import numpy as np
+# import matplotlib.pyplot as plt
+# from scipy.integrate import quad
+# import random
+# import emcee
+# get_ipython().magic(u'pylab inline')
+# pylab.rcParams['figure.figsize'] = (10, 10)
+#
+#
+# # In[3]:
+#
+# file_name = '/Users/wangcha/Documents/trees/IpythonNotebook/data/SCPUnion2_mu_vs_z.txt'
+# with open(file_name,'rb') as fptr:
+#     data = []
+#     for line in iter(lambda : fptr.readline(),''):
+#         if '#' not in line:
+#             data.append(
+#                 map(lambda x:float(x), line.split()[-3:])
+#             )
+#     redshift, magnitude, mag_error = zip(*data)
+#
+#     idx = np.array(redshift).argsort()
+#     redshift = np.array(redshift)[idx]
+#     magnitude = np.array(magnitude)[idx]
+#     mag_error = np.array(mag_error)[idx]
+#
+#
+# # In[4]:
+#
+# def mag_th(dL_func, p, z, M):
+#     dL = dL_func(p, z)
+#     return 5 * np.log10(dL) + M
+#
+# def LambdaCDM_dL(p, z):
+#
+#     OmegaM, OmegaLambda = p
+#     Omegak = 1. - OmegaM - OmegaLambda
+#     # dC: line-of-sight comoving distance
+#     dC, _ = quad(lambda x: 1./ np.sqrt(OmegaM*(1.+x)**3 + Omegak*(1.+x)**2 + OmegaLambda), 0, z)
+#
+#     # dM: transverse comving distance
+#     if  Omegak > 0:
+#         dM = 1./np.sqrt(Omegak) * np.sinh(np.sqrt(Omegak) * dC)
+#     elif Omegak ==0:
+#         dM = dC
+#     else:
+#         dM = 1./np.sqrt(-Omegak) * np.sin(np.sqrt(-Omegak) * dC)
+#
+#     return dM*(1+z)
+#
+# leterature_LambdaCDM_par = [0.282, 0.722]
+#
+# def wCDM_dL(p, z):
+#     # Omegak = 0, w=w0+wa(z/(1+z))
+#     # OmegaM, w0, wa= p
+#     OmegaM, w0= p
+#     def w(zz):
+#         return w0
+#         # return w0 + wa*(zz/(1.+zz))
+#
+#     OmegaDE = 1. - OmegaM
+#     DE_timedependence = np.exp(quad(lambda zz: 3.*(1+w(zz))/(1.+zz), 0, z)[0])
+#     dC, _ = quad(lambda x: 1./np.sqrt(OmegaM*(1.+x)**3 + OmegaDE * DE_timedependence), 0, z)
+#     return dC*(1+z)
+#
+# leterature_wCDM_par = [0.281, -1.011]
+#
+#
+# # In[278]:
+#
+# # plt.errorbar(redshift, magnitude, yerr=mag_error, fmt='.', markersize=.1, linewidth=.4)
+# # plt.plot(redshift, map(lambda z: mag_th(wCDM_dL, leterature_wCDM_par, z,41.2), redshift),
+# #         color='red',linewidth=1.2)
+# # plt.plot(redshift, map(lambda z: mag_th(LambdaCDM_dL, leterature_LambdaCDM_par, z,41.2), redshift),
+# #         color='cyan',linewidth=1.2)
+#
+# def chi2_wCDM_fix_w(OmegaM):
+#
+#     M = sum(
+#         [(mag - mag_th(wCDM_dL, [OmegaM, leterature_wCDM_par[1]], z, 0.))/mag_e**2
+#             for z, mag, mag_e in zip(redshift, magnitude, mag_error)] / sum([1./mag_e**2 for mag_e in mag_error])
+#     )
+#     # print M
+# #     def chi2_func(m):
+# #         chi2 = 0
+# #         for z, mag, mag_e in zip(redshift, magnitude, mag_error):
+# #             magth = mag_th(wCDM_dL, [OmegaM, leterature_wCDM_par[1]], z, m)
+# #             chi2 = chi2+(mag - magth)**2/mag_e**2
+# #         return chi2
+#     chi2 = 0
+#     for z, mag, mag_e in zip(redshift, magnitude, mag_error):
+#             magth = mag_th(wCDM_dL, [OmegaM, leterature_wCDM_par[1]], z, M)
+#             chi2 = chi2+(mag - magth)**2/mag_e**2
+#     return chi2
+# #    return chi2_func, M
+#
+# def chi2_wCDM_fix_OmegaM(w):
+#     chi2 = 0
+#     M = sum(
+#         [(mag - mag_th(wCDM_dL, [leterature_wCDM_par[0], w], z, 0.))/mag_e**2
+#             for z, mag, mag_e in zip(redshift, magnitude, mag_error)] / sum([1./mag_e**2 for mag_e in mag_error])
+#     )
+#     for z, mag, mag_e in zip(redshift, magnitude, mag_error):
+#         magth = mag_th(wCDM_dL, [leterature_wCDM_par[0], w], z, M)
+#         chi2 = chi2+(mag - magth)**2/mag_e**2
+#     return chi2
+#
+# def chi2_LambdaCDM_fix_OmegaM(OmegaLambda):
+#     chi2 = 0
+#     M = sum(
+#         [(mag - mag_th(LambdaCDM_dL, [leterature_LambdaCDM_par[0], OmegaLambda], z, 0.))/mag_e**2
+#             for z, mag, mag_e in zip(redshift, magnitude, mag_error)] / sum([1./mag_e**2 for mag_e in mag_error])
+#     )
+#     for z, mag, mag_e in zip(redshift, magnitude, mag_error):
+#         magth = mag_th(LambdaCDM_dL, [leterature_LambdaCDM_par[0], OmegaLambda], z, M)
+#         chi2 = chi2+(mag - magth)**2/mag_e**2
+#     return chi2
+#
+# def chi2_LambdaCDM_fix_OmegaLambda(OmegaM):
+#     chi2 = 0
+#     M = sum(
+#         [(mag - mag_th(LambdaCDM_dL, [OmegaM, leterature_LambdaCDM_par[1]], z, 0.))/mag_e**2
+#             for z, mag, mag_e in zip(redshift, magnitude, mag_error)] / sum([1./mag_e**2 for mag_e in mag_error])
+#     )
+#     for z, mag, mag_e in zip(redshift, magnitude, mag_error):
+#         magth = mag_th(LambdaCDM_dL, [OmegaM, leterature_LambdaCDM_par[1]], z, M)
+#         chi2 = chi2+(mag - magth)**2/mag_e**2
+#     return chi2
+#
+# ####################################
+# OmegaLambdas = np.linspace(0.5, 1.0, 50)
+# OmegaMs = np.linspace(0.15, .45, 50)
+# ws = np.linspace(-1.2, -0.9, 50)
+# ####################################
+# def liklihood(var_samples, chi2_func):
+#
+#     liklihood = []
+#     for var_sample in var_samples:
+#         liklihood.append(np.exp(-chi2_func(var_sample)/2.))
+#     liklihood = np.array(liklihood)
+#     return liklihood/max(np.array(liklihood))
+#
+# def one_var_confidence(var_samples, chi2_func):
+#     liklihoods = liklihood(var_samples, chi2_func)
+#     center = var_samples[liklihoods==1]
+#     def confidence(ll, lr):
+#         return quad(lambda x: np.interp(x, var_samples, liklihoods), center-ll, center+lr)[0]
+#     return confidence, liklihoods, center
+#
+#
+# lls = np.linspace(0,0.15,1000)
+#
+# def one_var_confidence_plot(var_samples, chi2_func, lls, axis, xlim=None):
+#
+# #     var_samples = ws
+# #     chi2_func = chi2_wCDM_fix_OmegaM
+#     confidence_func, liklihoods, center = one_var_confidence(var_samples, chi2_func)
+#
+#     confidencesl = np.array(map(lambda ll: confidence_func(ll, 0), lls))
+#     confidencesr = np.array(map(lambda lr: confidence_func(0, lr), lls))
+#     ll_95l = np.interp(0.95, confidencesl/max(confidencesl), lls)
+#     ll_95r = np.interp(0.95, confidencesr/max(confidencesr), lls)
+#
+#     ll_68l = np.interp(0.68, confidencesl/max(confidencesl), lls)
+#     ll_68r = np.interp(0.68, confidencesr/max(confidencesr), lls)
+#
+#     #plot(lls, confidences/max(confidences))
+#     axis.plot(var_samples, liklihoods)
+#
+#     fill = (var_samples > center-ll_68l) & (var_samples<center+ll_68r)
+#     fill_x = var_samples[fill]
+#     fill_y = liklihoods[fill]
+#     axis.fill_between(fill_x, np.zeros_like(fill_x),fill_y, alpha=.4,color='blue')
+#     fill = (var_samples > center-ll_95l) & (var_samples<center+ll_95r)
+#     fill_x = var_samples[fill]
+#     fill_y = liklihoods[fill]
+#     axis.fill_between(fill_x, np.zeros_like(fill_x),fill_y, alpha=0.4, color='grey')
+#     if xlim is not None:
+#         axis.set_xlim(xlim)
+#     print "95:%4f + %4f - %4f"% (center, ll_95r, ll_95l)
+#     print "68:%4f + %4f - %4f"% (center, ll_68r, ll_68l)
+#
+# fig, axisArr = plt.subplots(2,2)
+# ax1, ax2 = axisArr[0]
+# ax3, ax4 = axisArr[1]
+# one_var_confidence_plot(ws, chi2_wCDM_fix_OmegaM, np.linspace(0,0.15,200), ax1)
+# one_var_confidence_plot(OmegaMs, chi2_wCDM_fix_w, np.linspace(0,0.15,200), ax2)
+# one_var_confidence_plot(OmegaMs, chi2_LambdaCDM_fix_OmegaLambda,  np.linspace(0.001,0.15,200), ax3)
+# one_var_confidence_plot(OmegaLambdas, chi2_LambdaCDM_fix_OmegaM,  np.linspace(0,0.15,200), ax4)
+#
+# ax1.set_xlabel(r'$\omega$', fontsize=14)
+# ax2.set_xlabel(r'$\Omega_M$', fontsize=14)
+# ax3.set_xlabel(r'$\Omega_M$', fontsize=14)
+# ax4.set_xlabel(r'$\Omega_\Lambda$', fontsize=14)
+#
+# for ax, name in zip([ax1,ax2,ax3,ax4],[r'$\omega \mathrm{CDM}$', r'$\omega \mathrm{CDM}$'
+#                                        , r'$o\Lambda \mathrm{CDM}$',r'$o\Lambda \mathrm{CDM}$']):
+#     txt_x = .75*(ax.get_xlim()[1]-ax.get_xlim()[0])+ax.get_xlim()[0]
+#     txt_y = .75
+#     ax.text(txt_x, txt_y, name, fontsize=14)
+# fig.savefig('/Users/wangcha/Desktop/533project1.png')
+#
+#
+# # In[94]:
+#
+# def grid_search(par_range, liklihood_func):
+#
+#     par1_range, par2_range = par_range
+#
+#     liklihoods_on_gird = []
+#     pars_on_grid = []
+#     grids_number = 21
+#     for par1 in np.linspace(par1_range[0],par1_range[1],grids_number):
+#         for par2 in np.linspace(par2_range[0],par2_range[1],grids_number):
+#             liklihoods_on_gird.append(liklihood_func([par1, par2]))
+#             pars_on_grid.append([par1, par2])
+#
+#     return pars_on_grid, liklihoods_on_gird
+#
+# def liklihood_func_LambdaCDM(p):
+#     OmegaM, OmegaLambda = p
+#     chi2 = 0
+#     M = sum(
+#         [(mag - mag_th(LambdaCDM_dL, [OmegaM, OmegaLambda], z, 0.))/mag_e**2
+#             for z, mag, mag_e in zip(redshift, magnitude, mag_error)] / sum([1./mag_e**2 for mag_e in mag_error])
+#     )
+#     for z, mag, mag_e in zip(redshift, magnitude, mag_error):
+#         magth = mag_th(LambdaCDM_dL, [OmegaM, OmegaLambda], z, M)
+#         chi2 = chi2+(mag - magth)**2/mag_e**2
+#
+#     return np.exp(-chi2/2.)
+#
+# def liklihood_func_wCDM(p):
+#     OmegaM, w = p
+#     chi2 = 0
+#     M = sum(
+#         [(mag - mag_th(wCDM_dL, [OmegaM, w], z, 0.))/mag_e**2
+#             for z, mag, mag_e in zip(redshift, magnitude, mag_error)] / sum([1./mag_e**2 for mag_e in mag_error])
+#     )
+#     for z, mag, mag_e in zip(redshift, magnitude, mag_error):
+#         magth = mag_th(wCDM_dL, [OmegaM, w], z, M)
+#         chi2 = chi2+(mag - magth)**2/mag_e**2
+#     return np.exp(-chi2/2.)
+#
+# wCDM_par_range = [ [0., 1.], [-1.5, 0.]]
+# LambdaCDM_par_range = [[0., 1.], [0.,1.]]
+# # pars_on_grid_LambdaCDM, liklihoods_on_gird_LambdaCDM = grid_search(LambdaCDM_par_range, liklihood_func_LambdaCDM)
+# # pars_on_grid_wCDM, liklihoods_on_gird_wCDM = grid_search(wCDM_par_range, liklihood_func_wCDM)
+# # print np.array(pars_on_grid_wCDM)[liklihoods_on_gird_wCDM == min(liklihoods_on_gird_wCDM)]
+# # print np.array(pars_on_grid_LambdaCDM)[liklihoods_on_gird_LambdaCDM == min(liklihoods_on_gird_LambdaCDM)]
+#
+#
+# # In[ ]:
+#
+#
+#
+#
+# # In[506]:
+#
+# class Walker(object):
+#
+#     def __init__(self, pars_range, liklihood_func,
+#                  begin_step=500, burn_step=100,
+#                  random_initial=True, initial_pars=None,
+#                  global_step=True, step_box_length=None):
+#
+#         self.pars_range = pars_range
+#         self.liklihood_func = liklihood_func
+#
+#         if random_initial:
+#             self.initial_pars =             [random.uniform(low=par_range[0], high=par_range[1]) for par_range in pars_range]
+#         else:
+#             self.initial_pars = initial_pars
+#
+#         # parameters/liklihoods on the Markov Chain
+#         self.pars_on_chain = [self.initial_pars]
+#         self.liklihoods_on_chain = [liklihood_func(self.initial_pars)]
+#
+#         # the current step
+#         self.current_pars = self.initial_pars
+#
+#         # boolean indicating if the chain is burned
+#         self.burned = False
+#
+#         # boolean indicating the step select method,
+#         # if global_step, next step will be chosen uniformly randomly from the pars_range box,
+#         # if not global_step, a sized box centered at current step
+#         # is used to select next step uniformly randomly within it.
+#         self.global_step = global_step
+#         self.step_box_length = step_box_length
+#
+#         # number of steps from begining of the chain
+#         self.begin_step = begin_step
+#
+#         # number of steps after burned
+#         self.burn_step = burn_step
+#
+#     def add_new_step(self, new_pars, new_liklihood):
+#         """
+#         add new step to the chain
+#         """
+#         self.current_pars = new_pars
+#         self.pars_on_chain.append(new_pars)
+#         self.liklihoods_on_chain.append(new_liklihood)
+#
+#     def step_select_method(self):
+#         """
+#         if global_step, next step will be chosen uniformly randomly from the pars_range box,
+#         if not global_step, a sized box centered at current step
+#         is used to select next step uniformly randomly within it.
+#         """
+#         if self.global_step:
+#             return [random.uniform(low=par_range[0], high=par_range[1]) for par_range in self.pars_range]
+#         else:
+#             return [current_par + random.normal(0, length)
+#                     for current_par, length in zip(self.current_pars, self.step_box_length)]
+#
+#     def step_accept_method(self):
+#         """
+#         standing at the current step, given a new step candidate generated by self.step_select_method,
+#         return if accept the candidate step
+#         using following to achieve detailed balance:
+#         if candicate_pars exceed pars_range: decline (return False)
+#         if liklihood(current) < liklihood(candidate): accept (add candidate and return True)
+#         if liklihood(current) > liklihood(candidate):
+#         accept at a possibility of liklihood(candidate)/liklihood(current) or decline
+#         """
+#         candidate_pars = self.step_select_method()
+#         # any par exceed the pars_range, decline
+#         if any([(candidate_par > par_range[1]) | (candidate_par < par_range[0])
+#                 for candidate_par, par_range in zip(candidate_pars, self.pars_range)]):
+#             return False
+#
+#         # get the liklihood of both current and candidate pars for comparison
+#         current_l = self.liklihoods_on_chain[-1]
+#         candidate_l = self.liklihood_func(candidate_pars)
+#
+#         if current_l < candidate_l:
+#             if random.uniform() < 1./2:
+#                 self.add_new_step(candidate_pars, candidate_l)
+#                 return True
+#             else:
+#                 return False
+#         else:
+#             # simulate the "possibility"
+#             if random.uniform() < candidate_l/current_l/2.:
+#                 self.add_new_step(candidate_pars, candidate_l)
+#                 return True
+#             else:
+#                 return False
+#
+#     def begin_walk(self):
+#         """
+#         begin walking from initial
+#         """
+#         print "begin walking..."
+#         total_iter = 0
+#         for nn in range(self.begin_step):
+#             # if not finding an acceptable new step, keep finding
+#             niter = 1
+#             while not self.step_accept_method():
+#                 # if self.step_accept_method returns true,
+#                 # chain is already updated by it, so nothing to do here
+#                 niter = niter+1
+#                 continue
+#             print "accept after %d"% niter
+#             total_iter = total_iter+niter
+#         print "efficiency: step %d processed over %d iterations"%(self.begin_step, total_iter)
+#         return self.pars_on_chain, self.liklihoods_on_chain
+#
+#
+# # In[512]:
+#
+# Lambda_CDM_walker = Walker(LambdaCDM_par_range, liklihood_func_LambdaCDM, initial_pars=pars_on_chain[-1]
+#                            , begin_step=2000, global_step = False,
+#                             step_box_length=[0.01, 0.01])
+# pars_on_chain, liklihoods_on_chain = Lambda_CDM_walker.begin_walk()
+#
+#
+# # In[513]:
+#
+# # pars_on_chain, liklihoods_on_chain
+# np.array(pars_on_chain)[liklihoods_on_chain==max(liklihoods_on_chain)]
+#
+#
+# # In[514]:
+#
+# plt.plot(liklihoods_on_chain / max(liklihoods_on_chain))
+#
+#
+# # In[537]:
+#
+# # plt.scatter(zip(*pars_on_chain)[0],zip(*pars_on_chain)[1])
+# Z, x, y, _ = plt.hist2d( zip(*pars_on_chain)[0], zip(*pars_on_chain)[1],cmap='Reds', bins=50,  range=[[0.,.5],[.5,1]])
+# X, Y = numpy.meshgrid(x[1:], y[1:])
+# plt.hold(True)
+#
+#
+# # In[100]:
+#
+# import emcee
+#
+# def mcmc_go(mcmc_inf, liklihood_func, pars_range):
+#
+#     def log_prior(pars):
+#         if any([(candidate_par > par_range[1]) | (candidate_par < par_range[0])
+#                 for candidate_par, par_range in zip(pars, pars_range)]):
+#             return -np.inf
+#         else:
+#             return 1
+#
+#     def log_liklihood(pars):
+#         if any([(candidate_par > par_range[1]) | (candidate_par < par_range[0])
+#                 for candidate_par, par_range in zip(pars, pars_range)]):
+#             return -np.inf
+#         else:
+#             return np.log(liklihood_func(pars))
+#
+#     def log_posterior(pars):
+#         return log_prior(pars) + log_liklihood(pars)
+#
+#     ndim, nwalkers, nburn, nsteps = mcmc_inf
+#
+#     init_par1 = random.uniform(pars_range[0][0],pars_range[0][1],nwalkers)
+#     init_par2 = random.uniform(pars_range[1][0],pars_range[1][1],nwalkers)
+#     starting_pars = np.vstack([init_par1, init_par2]).T
+#
+#     sampler = emcee.EnsembleSampler(nwalkers, ndim, log_posterior)
+#     sampler.run_mcmc(starting_pars, nsteps)
+#     emcee_trace = sampler.chain[:, nburn:, :].reshape(-1, ndim).T
+#
+#     return emcee_trace
+#
+# mcmc_inf = [2, 4, 500, 1000]
+# emcee_trace2 = mcmc_go(mcmc_inf, liklihood_func_wCDM, wCDM_par_range)
+#
+#
+# # In[108]:
+#
+# from matplotlib.patches import Ellipse
+#
+# def plot_point_cov(points, nstd=2, ax=None, **kwargs):
+#     """
+#     Plots an `nstd` sigma ellipse based on the mean and covariance of a point
+#     "cloud" (points, an Nx2 array).
+#
+#     Parameters
+#     ----------
+#         points : An Nx2 array of the data points.
+#         nstd : The radius of the ellipse in numbers of standard deviations.
+#             Defaults to 2 standard deviations.
+#         ax : The axis that the ellipse will be plotted on. Defaults to the
+#             current axis.
+#         Additional keyword arguments are pass on to the ellipse patch.
+#
+#     Returns
+#     -------
+#         A matplotlib ellipse artist
+#     """
+#     pos = points.mean(axis=0)
+#     cov = np.cov(points, rowvar=False)
+#     return plot_cov_ellipse(cov, pos, nstd, ax, **kwargs), pos
+#
+# def plot_cov_ellipse(cov, pos, nstd=2, ax=None, **kwargs):
+#     """
+#     Plots an `nstd` sigma error ellipse based on the specified covariance
+#     matrix (`cov`). Additional keyword arguments are passed on to the
+#     ellipse patch artist.
+#
+#     Parameters
+#     ----------
+#         cov : The 2x2 covariance matrix to base the ellipse on
+#         pos : The location of the center of the ellipse. Expects a 2-element
+#             sequence of [x0, y0].
+#         nstd : The radius of the ellipse in numbers of standard deviations.
+#             Defaults to 2 standard deviations.
+#         ax : The axis that the ellipse will be plotted on. Defaults to the
+#             current axis.
+#         Additional keyword arguments are pass on to the ellipse patch.
+#
+#     Returns
+#     -------
+#         A matplotlib ellipse artist
+#     """
+#     def eigsorted(cov):
+#         vals, vecs = np.linalg.eigh(cov)
+#         order = vals.argsort()[::-1]
+#         return vals[order], vecs[:,order]
+#
+#     if ax is None:
+#         ax = plt.gca()
+#
+#     vals, vecs = eigsorted(cov)
+#     theta = np.degrees(np.arctan2(*vecs[:,0][::-1]))
+#
+#     # Width and height are "full" widths, not radius
+#     width, height = 2 * nstd * np.sqrt(vals)
+#     ellip = Ellipse(xy=pos, width=width, height=height, angle=theta, **kwargs)
+#
+#     ax.add_artist(ellip)
+#     return ellip
+#
+# if __name__ == '__main__':
+#     #-- Example usage -----------------------
+#
+#     # plt.plot(x, y, '.',color='grey', alpha=.1)
+#
+#     # Plot a transparent 3 standard deviation covariance ellipse
+#     fig, axis = plt.subplots(1,2)
+#     ax1 = axis[0]
+#     ax2 = axis[1]
+#
+#     # Generate some random, correlated data
+#     points = emcee_trace.T
+#     # Plot the raw points...
+#     x, y = points.T
+#     _, c = plot_point_cov(points, nstd=1, alpha=.7, color='grey', ax = ax1)
+#     plot_point_cov(points, nstd=2, alpha=0.5, color='grey', ax = ax1)
+#     plot_point_cov(points, nstd=3, alpha=0.3, color='grey', ax = ax1)
+#
+#     ax1.scatter(c[0], c[1], marker='o',color='black')
+#     ax1.set_xlim(0, 1.)
+#     ax1.set_ylim(0, 1.4)
+#
+#     points = emcee_trace2.T
+#     x, y = points.T
+#     _, c = plot_point_cov(points, nstd=1, alpha=.7, color='grey', ax = ax2)
+#     plot_point_cov(points, nstd=2, alpha=0.5, color='grey', ax = ax2)
+#     plot_point_cov(points, nstd=3, alpha=0.3, color='grey', ax = ax2)
+#
+#     plt.scatter(x, y)
+#     ax2.scatter(c[0], c[1], marker='o',color='black')
+#     ax2.set_xlim(0, .5)
+#     ax2.set_ylim(-1.5, 0)
+#
+#
+# # In[ ]:
+#
+#
+#
+#
+# # In[ ]:
+#
+#
+#
+#
+# # In[ ]:
+#
+#
+#
